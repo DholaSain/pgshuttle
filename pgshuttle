@@ -1,0 +1,591 @@
+#!/usr/bin/env bash
+# pgshuttle -- copy a large PostgreSQL database into a local throwaway container,
+# one table at a time, resumably. A dropped connection costs one table, not the
+# run: re-run the same command and it continues. Images are built and pulled up
+# front, so the transfer itself needs nothing but the database.
+#
+#   ./pgshuttle prepare     build + pull everything      (needs internet)
+#   ./pgshuttle doctor      confirm it can run offline
+#   ./pgshuttle preflight   can we reach the source?     (needs the source)
+#   ./pgshuttle dump        pull the data, resumable     (needs the source)
+#   ./pgshuttle restore     load it locally              (offline)
+#   ./pgshuttle verify      row-count comparison         (offline)
+
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TOOLBOX_TAG="pgshuttle-toolbox"
+
+# Which config to read. Point PGSHUTTLE_ENV at another file to drive a second
+# database from the same checkout:  PGSHUTTLE_ENV=.env.staging ./pgshuttle dump
+ENV_FILE="${PGSHUTTLE_ENV:-.env}"
+case "$ENV_FILE" in /*) ;; *) ENV_FILE="$ROOT/$ENV_FILE" ;; esac
+
+C_RESET=$'\033[0m'; C_DIM=$'\033[2m'; C_RED=$'\033[31m'
+C_GREEN=$'\033[32m'; C_YELLOW=$'\033[33m'; C_BLUE=$'\033[34m'; C_BOLD=$'\033[1m'
+say()  { printf '%s%s%s\n' "$C_BLUE" "$*" "$C_RESET"; }
+ok()   { printf '%s✓ %s%s\n' "$C_GREEN" "$*" "$C_RESET"; }
+warn() { printf '%s! %s%s\n' "$C_YELLOW" "$*" "$C_RESET" >&2; }
+bad()  { printf '%s✗ %s%s\n' "$C_RED" "$*" "$C_RESET" >&2; }
+die()  { bad "$*"; exit 1; }
+
+# ------------------------------------------------------------------- config --
+# Read as data, not as shell. A connection URL contains & and ? and very often a
+# # or a $ inside the password; sourcing it would background half the line.
+load_env() {
+  local file="$1" line key val TAB
+  TAB=$(printf '\t')
+  while IFS= read -r line || [ -n "$line" ]; do
+    line="${line%$'\r'}"
+    case "$line" in ''|'#'*) continue ;; esac
+    case "$line" in *=*) ;; *) continue ;; esac
+    key="${line%%=*}"; val="${line#*=}"
+    key="${key#export }"
+    key="${key## }"; key="${key%% }"
+    case "$key" in
+      [A-Za-z_]*) ;;
+      *) continue ;;
+    esac
+    case "$key" in *[!A-Za-z0-9_]*) continue ;; esac
+    while :; do
+      case "$val" in " "*|"$TAB"*) val="${val#?}" ;; *) break ;; esac
+    done
+    case "$val" in
+      \"*) val="${val#\"}"; val="${val%%\"*}" ;;
+      \'*) val="${val#\'}"; val="${val%%\'*}" ;;
+      *)
+        # Same rule docker compose uses: an unquoted value ends at whitespace
+        # followed by '#'. A connection URL has no spaces, so this cannot eat a
+        # password (and a literal '#' in one has to be %23 anyway).
+        val="${val%%[[:space:]]#*}"
+        while :; do
+          case "$val" in *" "|*"$TAB") val="${val%?}" ;; *) break ;; esac
+        done
+        ;;
+    esac
+    printf -v "$key" '%s' "$val"
+    export "$key"
+  done < "$file"
+}
+
+if [ -f "$ENV_FILE" ]; then
+  load_env "$ENV_FILE"
+elif [ "${1:-}" != "init" ] && [ "${1:-}" != "help" ] && [ -n "${1:-}" ]; then
+  die "no config found at $ENV_FILE. Run: ./pgshuttle init"
+fi
+
+PG_MAJOR="${PG_MAJOR:-16}"
+PG_IMAGE="${PG_IMAGE:-postgres:$PG_MAJOR}"
+TARGET_USER="${TARGET_USER:-postgres}"
+TARGET_PASSWORD="${TARGET_PASSWORD:-postgres}"
+TARGET_DB="${TARGET_DB:-appdb}"
+TARGET_PORT="${TARGET_PORT:-5433}"
+JOBS_DUMP="${JOBS_DUMP:-2}"
+JOBS_RESTORE="${JOBS_RESTORE:-4}"
+ZLEVEL="${ZLEVEL:-3}"
+DUMP_ORDER="${DUMP_ORDER:-asc}"
+EXACT_COUNTS="${EXACT_COUNTS:-0}"
+IMAGE="$TOOLBOX_TAG:$PG_MAJOR"
+
+# Everything below is namespaced by PROJECT, so two databases can be set up side
+# by side -- different container, volume, and directories -- without colliding.
+PROJECT="${PROJECT:-pgshuttle}"
+BACKUP_ROOT="$ROOT/${BACKUPS_DIR:-backups}"
+EXPORT_ROOT="$ROOT/${EXPORTS_DIR:-exports}"
+TARGET_CONTAINER="$PROJECT-target"
+
+# The toolbox reaches the target container through the port published on the
+# host, so the same URL also works if you repoint it at Homebrew Postgres.
+TGT_DB_URL="${TGT_DB_URL:-postgresql://$TARGET_USER:$TARGET_PASSWORD@host.docker.internal:$TARGET_PORT/$TARGET_DB}"
+
+# ------------------------------------------------------------------ helpers --
+have() { command -v "$1" >/dev/null 2>&1; }
+
+docker_ok() {
+  have docker || die "docker is not installed"
+  docker info >/dev/null 2>&1 || die "Docker daemon is not running -- start Docker Desktop"
+}
+
+image_present() { docker image inspect "$1" >/dev/null 2>&1; }
+
+url_host() {
+  local t="${1#*://}"; t="${t##*@}"; t="${t%%/*}"; t="${t%%\?*}"; t="${t%%:*}"
+  printf '%s' "$t"
+}
+
+redact() { printf '%s' "$1" | sed -E 's#(://[^:/@]+):[^@]*@#\1:****@#'; }
+
+# The source hostname is resolved on the host, not in the container: behind a
+# VPN or split-horizon DNS the host resolver is the one that works, and Docker's
+# is where these setups usually break.
+needs_resolve() {
+  case "$1" in
+    ''|localhost|127.0.0.1|host.docker.internal|*.local) return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
+resolve_host() {
+  local h="$1" ip=""
+  if have dig; then ip=$(dig +short "$h" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | tail -1); fi
+  if [ -z "$ip" ] && have nslookup; then
+    ip=$(nslookup "$h" 2>/dev/null | awk '/^Address: /{print $2}' | grep -E '^[0-9]+\.' | tail -1)
+  fi
+  if [ -z "$ip" ] && have python3; then
+    ip=$(python3 -c "import socket,sys;print(socket.gethostbyname(sys.argv[1]))" "$h" 2>/dev/null)
+  fi
+  printf '%s' "$ip"
+}
+
+current_run() {
+  [ -f "$BACKUP_ROOT/.current" ] && cat "$BACKUP_ROOT/.current" || true
+}
+
+new_run() {
+  local id; id="run-$(date +%Y%m%d-%H%M)"
+  mkdir -p "$BACKUP_ROOT/$id"
+  printf '%s' "$id" > "$BACKUP_ROOT/.current"
+  printf '%s' "$id"
+}
+
+need_run() {
+  local id; id="$(current_run)"
+  [ -n "$id" ] && [ -d "$BACKUP_ROOT/$id" ] || die "no backup run yet -- run ./pgshuttle dump first"
+  printf '%s' "$id"
+}
+
+# run_toolbox <script> [extra docker args...]
+run_toolbox() {
+  local script="$1"; shift
+  local -a args=()
+  [ -t 0 ] && args+=(-t)
+  [ -t 0 ] && [ -t 1 ] && args+=(-i)
+
+  local shost hip
+  shost="$(url_host "${SRC_DB_URL:-}")"
+  if [ "${SKIP_SRC_RESOLVE:-0}" != "1" ] && needs_resolve "$shost"; then
+    hip="$(resolve_host "$shost")"
+    if [ -n "$hip" ]; then
+      args+=(--add-host "$shost:$hip")
+    else
+      warn "could not resolve $shost on the host; falling back to Docker's resolver"
+    fi
+  fi
+
+  docker run --rm ${args[@]+"${args[@]}"} \
+    --name "$PROJECT-$(basename "$script" .sh)-$$" \
+    --add-host host.docker.internal:host-gateway \
+    -v "$BACKUP_ROOT:/backups" \
+    -v "$ROOT/scripts:/scripts:ro" \
+    -e SRC_DB_URL="${SRC_DB_URL:-}" \
+    -e TGT_DB_URL="$TGT_DB_URL" \
+    -e RUN_DIR="${RUN_DIR:-}" \
+    -e JOBS="${JOBS:-2}" \
+    -e ZLEVEL="$ZLEVEL" \
+    -e DUMP_ORDER="$DUMP_ORDER" \
+    -e EXACT_COUNTS="$EXACT_COUNTS" \
+    -e RESTORE_FRESH="${RESTORE_FRESH:-0}" \
+    -e REFRESH_TABLES="${REFRESH_TABLES:-0}" \
+    -e TOLERANCE="${TOLERANCE:-5}" \
+    -e OUT="${OUT:-}" \
+    -e EXPORT_EXCLUDES="${EXPORT_EXCLUDES:-}" \
+    -e EXPORT_ZLEVEL="${EXPORT_ZLEVEL:-6}" \
+    -e IMPORT_FILE="${IMPORT_FILE:-}" \
+    "$@" \
+    "$IMAGE" "/scripts/$script"
+}
+
+compose() { (cd "$ROOT" && docker compose --env-file "$ENV_FILE" -p "$PROJECT" "$@"); }
+
+target_up() {
+  docker_ok
+  say "starting the local target Postgres on 127.0.0.1:$TARGET_PORT ..."
+  compose up -d target >/dev/null || die "could not start the target container"
+  local i=0
+  while [ "$i" -lt 60 ]; do
+    if docker exec "$TARGET_CONTAINER" pg_isready -U "$TARGET_USER" -d "$TARGET_DB" >/dev/null 2>&1; then
+      ok "target ready at postgresql://$TARGET_USER@localhost:$TARGET_PORT/$TARGET_DB"
+      return 0
+    fi
+    sleep 1; i=$((i + 1))
+  done
+  die "target container did not become ready -- check: docker logs $TARGET_CONTAINER"
+}
+
+# ----------------------------------------------------------------- commands --
+cmd_init() {
+  if [ -f "$ENV_FILE" ]; then
+    ok "$(basename "$ENV_FILE") already exists"
+  else
+    cp "$ROOT/.env.example" "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+    ok "created $(basename "$ENV_FILE") -- open it and set SRC_DB_URL"
+  fi
+  echo "  $ENV_FILE"
+}
+
+cmd_prepare() {
+  docker_ok
+  say "This step needs internet access. Do it before you cut over to a\n   restricted network -- nothing after it downloads anything."
+  echo
+  say "pulling $PG_IMAGE ..."
+  docker pull "$PG_IMAGE" || die "pull failed"
+  if [ "$PG_IMAGE" != "postgres:$PG_MAJOR" ]; then
+    say "pulling postgres:$PG_MAJOR (toolbox base) ..."
+    docker pull "postgres:$PG_MAJOR" || die "pull failed"
+  fi
+  say "building $IMAGE ..."
+  (cd "$ROOT" && docker build --build-arg "PG_MAJOR=$PG_MAJOR" -t "$IMAGE" .) || die "build failed"
+  mkdir -p "$BACKUP_ROOT"
+  echo
+  ok "everything is cached locally; no further downloads are needed"
+  cmd_doctor
+}
+
+cmd_doctor() {
+  docker_ok
+  echo
+  printf '%sOffline readiness%s\n' "$C_BOLD" "$C_RESET"
+  local fail=0
+
+  if image_present "$IMAGE"; then ok "toolbox image $IMAGE"; else bad "toolbox image $IMAGE missing -- run ./pgshuttle prepare"; fail=1; fi
+  if image_present "$PG_IMAGE"; then ok "target image $PG_IMAGE"; else bad "target image $PG_IMAGE missing -- run ./pgshuttle prepare"; fail=1; fi
+
+  if [ -f "$ENV_FILE" ]; then ok "config $(basename "$ENV_FILE") present"; else bad "config missing -- run ./pgshuttle init"; fail=1; fi
+  if [ -z "${SRC_DB_URL:-}" ] || [[ "$SRC_DB_URL" == *"your-instance"* ]]; then
+    bad "SRC_DB_URL not set in $(basename "$ENV_FILE")"; fail=1
+  elif [[ "$SRC_DB_URL" == *"REPLACE_ME"* ]]; then
+    bad "SRC_DB_URL still has the REPLACE_ME placeholder -- put the real password in $(basename "$ENV_FILE")"; fail=1
+  else
+    ok "SRC_DB_URL set -> $(redact "$SRC_DB_URL")"
+  fi
+
+  local cli
+  cli=$(docker run --rm "$IMAGE" -c 'pg_dump --version' 2>/dev/null | awk '{print $3}')
+  [ -n "$cli" ] && ok "toolbox pg_dump $cli" || { bad "toolbox image will not run"; fail=1; }
+
+  mkdir -p "$BACKUP_ROOT"
+  ok "backup directory $BACKUP_ROOT"
+
+  local free
+  free=$(df -h "$BACKUP_ROOT" | awk 'NR==2{print $4}')
+  ok "free disk on that volume: $free  (want ~3x the compressed dump)"
+
+  if docker ps --format '{{.Names}}' | grep -qx "$TARGET_CONTAINER"; then
+    ok "target container running on 127.0.0.1:$TARGET_PORT"
+  else
+    printf '  %s· target container not started (restore starts it for you)%s\n' "$C_DIM" "$C_RESET"
+  fi
+
+  echo
+  [ "$fail" = 0 ] && ok "ready -- connect to the source network and run ./pgshuttle preflight" \
+                  || die "not ready yet, see above"
+}
+
+cmd_preflight() {
+  docker_ok
+  [ -n "${SRC_DB_URL:-}" ] || die "SRC_DB_URL is not set in $(basename "$ENV_FILE")"
+  image_present "$IMAGE" || die "toolbox image missing -- run ./pgshuttle prepare while you have internet"
+
+  local shost hip
+  shost="$(url_host "$SRC_DB_URL")"
+  if needs_resolve "$shost"; then
+    say "resolving $shost on the host ..."
+    hip="$(resolve_host "$shost")"
+    if [ -n "$hip" ]; then
+      ok "resolves to $hip"
+    else
+      warn "the host cannot resolve $shost -- is your link to the source up?"
+    fi
+  fi
+
+  say "connecting from inside a container ..."
+  RUN_DIR=/backups run_toolbox preflight.sh
+}
+
+cmd_dump() {
+  docker_ok
+  [ -n "${SRC_DB_URL:-}" ] || die "SRC_DB_URL is not set in $(basename "$ENV_FILE")"
+  image_present "$IMAGE" || die "toolbox image missing -- run ./pgshuttle prepare while you have internet"
+  mkdir -p "$BACKUP_ROOT"
+
+  local id
+  if [ "${1:-}" = "--new" ] || [ -z "$(current_run)" ]; then
+    id="$(new_run)"
+    say "starting a new backup run: $id"
+  else
+    id="$(current_run)"
+    [ -d "$BACKUP_ROOT/$id" ] || id="$(new_run)"
+    say "resuming backup run: $id"
+  fi
+
+  RUN_DIR="/backups/$id" JOBS="$JOBS_DUMP" run_toolbox dump.sh
+  local rc=$?
+  if [ "$rc" = 2 ]; then
+    echo
+    warn "incomplete. Restore the connection and run the exact same command:"
+    printf '    ./pgshuttle dump\n'
+  fi
+  return $rc
+}
+
+cmd_restore() {
+  docker_ok
+  local id; id="$(need_run)"
+  [ "${1:-}" = "--fresh" ] && RESTORE_FRESH=1 && say "--fresh: the target will be wiped first"
+  target_up
+  SKIP_SRC_RESOLVE=1 RUN_DIR="/backups/$id" JOBS="$JOBS_RESTORE" RESTORE_FRESH="${RESTORE_FRESH:-0}" run_toolbox restore.sh
+}
+
+cmd_verify() {
+  docker_ok
+  local id; id="$(need_run)"
+  target_up
+  SKIP_SRC_RESOLVE=1 RUN_DIR="/backups/$id" run_toolbox verify.sh
+}
+
+# One standard file, made from the local copy. The slow network pull already
+# happened; this is what teammates get instead of repeating it.
+cmd_export() {
+  docker_ok
+  local out="" excl="" name
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --out) out="$2"; shift 2 ;;
+      --exclude) excl="$excl$2"$'\n'; shift 2 ;;
+      *) die "unknown option for export: $1 (use --out FILE, --exclude TABLE)" ;;
+    esac
+  done
+
+  target_up >/dev/null
+  mkdir -p "$EXPORT_ROOT"
+  [ -n "$out" ] || out="${TARGET_DB}-$(date +%Y%m%d).dump"
+  name="$(basename "$out")"
+
+  SKIP_SRC_RESOLVE=1 OUT="/exports/$name" EXPORT_EXCLUDES="$excl" EXPORT_ZLEVEL="${EXPORT_ZLEVEL:-6}" \
+    run_toolbox export.sh -v "$EXPORT_ROOT:/exports"
+  local rc=$?
+  [ "$rc" = 0 ] && printf '\n  %sfile is at%s %s/%s\n' "$C_DIM" "$C_RESET" "${EXPORTS_DIR:-exports}" "$name"
+  return $rc
+}
+
+cmd_import() {
+  docker_ok
+  local f="${1:-}"
+  [ -n "$f" ] || die "usage: ./pgshuttle import <file.dump>"
+  [ -f "$f" ] || die "no such file: $f"
+  local abs; abs="$(cd "$(dirname "$f")" && pwd)/$(basename "$f")"
+  target_up >/dev/null
+  SKIP_SRC_RESOLVE=1 IMPORT_FILE="/import/$(basename "$f")" JOBS="$JOBS_RESTORE" \
+    run_toolbox import.sh -v "$(dirname "$abs"):/import:ro"
+}
+
+cmd_status() {
+  local id; id="$(current_run)"
+  if [ -z "$id" ] || [ ! -d "$BACKUP_ROOT/$id" ]; then say "no backup run yet"; return 0; fi
+  local d="$BACKUP_ROOT/$id"
+  printf '%srun %s%s\n' "$C_BOLD" "$id" "$C_RESET"
+  [ -f "$d/meta.env" ] && sed 's/^/  /' "$d/meta.env"
+  local total done_ restored
+  total=$( [ -f "$d/tables.tsv" ] && wc -l < "$d/tables.tsv" | tr -d ' ' || echo 0 )
+  done_=$(find "$d/data" -name '*.dump' -type f 2>/dev/null | wc -l | tr -d ' ')
+  restored=$(find "$d/restored" -name '*.ok' -type f 2>/dev/null | wc -l | tr -d ' ')
+  printf '  tables dumped   %s/%s\n' "$done_" "$total"
+  printf '  tables restored %s/%s\n' "$restored" "$total"
+  printf '  pre-data        %s\n'  "$( [ -f "$d/pre-data.dump" ]  && echo yes || echo no )"
+  printf '  post-data       %s\n'  "$( [ -f "$d/post-data.dump" ] && echo yes || echo no )"
+  printf '  dump complete   %s\n'  "$( [ -f "$d/DUMP_COMPLETE" ] && echo yes || echo no )"
+  printf '  size on disk    %s\n'  "$(du -sh "$d" 2>/dev/null | awk '{print $1}')"
+  local nfail
+  nfail=$(find "$d/logs/failed" -name '*.err' -type f 2>/dev/null | wc -l | tr -d ' ')
+  [ "$nfail" -gt 0 ] && warn "$nfail table(s) failed on the last pass -- see $d/logs/failed/"
+  echo
+  say "all runs:"
+  ls -1 "$BACKUP_ROOT" 2>/dev/null | grep '^run-' | sed 's/^/  /'
+}
+
+# A dump prints a line only when a table *finishes*, so a single large table can
+# look identical to a dead tunnel for minutes. This watches the bytes instead:
+# a .part file that is growing is progress, one that is not is a stall.
+cmd_watch() {
+  local id d interval stall
+  id="$(need_run)"; d="$BACKUP_ROOT/$id"
+  interval="${WATCH_INTERVAL:-3}"
+  # A dead tunnel takes roughly 1-3 minutes to surface as an actual error,
+  # because Docker's network proxy answers the keepalives that would otherwise
+  # catch it sooner. Warn well before that so you are not left guessing.
+  stall="${STALL_SECONDS:-90}"
+
+  local prev_snapshot; prev_snapshot="$(mktemp)"
+  local last_change now_ts total prev_total=-1 tty=0
+  [ -t 1 ] && tty=1
+  last_change=$(date +%s)
+  trap 'rm -f "$prev_snapshot"; printf "\033[?25h\n"; exit 0' INT TERM
+  [ "$tty" = 1 ] && printf '\033[?25l'
+
+  while true; do
+    now_ts=$(date +%s)
+    total=$(du -sk "$d" 2>/dev/null | awk '{print $1}')
+    [ -z "$total" ] && total=0
+    if [ "$total" != "$prev_total" ]; then last_change=$now_ts; prev_total="$total"; fi
+    local since=$((now_ts - last_change))
+
+    local tables done_ inflight
+    tables=$( [ -f "$d/tables.tsv" ] && wc -l < "$d/tables.tsv" | tr -d ' ' || echo '?' )
+    done_=$(find "$d/data" -name '*.dump' -type f 2>/dev/null | wc -l | tr -d ' ')
+    inflight=$(find "$d/data" -name '*.part' -type f 2>/dev/null | wc -l | tr -d ' ')
+
+    [ "$tty" = 1 ] && printf '\033[H\033[2J'
+    printf '%swatching %s%s   %s\n\n' "$C_BOLD" "$id" "$C_RESET" "$(date +%H:%M:%S)"
+    printf '  tables dumped   %s%s/%s%s\n' "$C_BOLD" "$done_" "$tables" "$C_RESET"
+    printf '  on disk         %s\n' "$(du -sh "$d" 2>/dev/null | awk '{print $1}')"
+    printf '  in flight       %s\n' "$inflight"
+
+    if [ "$inflight" -gt 0 ]; then
+      echo
+      find "$d/data" -name '*.part' -type f 2>/dev/null | while read -r f; do
+        local sz age rate psz
+        sz=$(wc -c < "$f" 2>/dev/null || echo 0)
+        age=$(( now_ts - $(date -r "$f" +%s 2>/dev/null || echo "$now_ts") ))
+        psz=$(awk -v p="$f" '$1==p {print $2}' "$prev_snapshot" 2>/dev/null)
+        if [ -n "$psz" ] && [ "$sz" -gt "$psz" ]; then
+          rate="+$(( (sz - psz) / 1024 / interval )) KB/s"
+        elif [ -n "$psz" ]; then
+          rate="no growth"
+        else
+          rate="starting"
+        fi
+        printf '    %-52s %8s  %-12s idle %ss\n' \
+          "$(basename "$f" .dump.part)" "$(du -h "$f" 2>/dev/null | awk '{print $1}')" "$rate" "$age"
+      done
+    fi
+
+    find "$d/data" -name '*.part' -type f 2>/dev/null \
+      | while read -r f; do printf '%s %s\n' "$f" "$(wc -c < "$f" 2>/dev/null || echo 0)"; done \
+      > "$prev_snapshot"
+
+    echo
+    if [ "$since" -ge "$stall" ]; then
+      printf '  %sSTALLED -- nothing has changed on disk for %ss%s\n' "$C_RED" "$since" "$C_RESET"
+      printf '  %sThe connection is almost certainly dead. In the dump terminal press Ctrl-C,%s\n' "$C_RED" "$C_RESET"
+      printf '  %srestore the connection, then run ./pgshuttle dump again -- it resumes.%s\n' "$C_RED" "$C_RESET"
+    elif [ "$since" -ge $((stall / 2)) ]; then
+      printf '  %squiet for %ss -- fine on a big table, suspicious past %ss%s\n' "$C_YELLOW" "$since" "$stall" "$C_RESET"
+    else
+      printf '  %slast change %ss ago -- progressing%s\n' "$C_GREEN" "$since" "$C_RESET"
+    fi
+    printf '\n  %sCtrl-C to stop watching (does not affect the dump)%s\n' "$C_DIM" "$C_RESET"
+
+    sleep "$interval"
+  done
+}
+
+# Complements watch: watch says whether bytes are arriving, this says whether
+# the server is still working on your query or the connection is gone.
+cmd_activity() {
+  docker_ok
+  [ -n "${SRC_DB_URL:-}" ] || die "SRC_DB_URL is not set in $(basename "$ENV_FILE")"
+  RUN_DIR=/backups run_toolbox activity.sh
+}
+
+cmd_psql() {
+  docker_ok
+  target_up >/dev/null
+  # Interactive when you have a terminal, pipeable when you do not, so
+  # `./pgshuttle psql -At -c '...'` works inside scripts too.
+  local -a tty=()
+  [ -t 0 ] && [ -t 1 ] && tty=(-it)
+  docker exec ${tty[@]+"${tty[@]}"} "$TARGET_CONTAINER" \
+    psql -U "$TARGET_USER" -d "$TARGET_DB" "$@"
+}
+
+cmd_shell()   { docker_ok; run_toolbox_shell; }
+run_toolbox_shell() {
+  docker run --rm -it \
+    --add-host host.docker.internal:host-gateway \
+    -v "$BACKUP_ROOT:/backups" -v "$ROOT/scripts:/scripts:ro" \
+    -e SRC_DB_URL="${SRC_DB_URL:-}" -e TGT_DB_URL="$TGT_DB_URL" \
+    "$IMAGE"
+}
+
+cmd_up()   { target_up; }
+cmd_down() { docker_ok; compose down; ok "target stopped (data kept in volume ${PROJECT}_pgdata)"; }
+cmd_reset() {
+  docker_ok
+  printf 'This deletes the restored database for project '$PROJECT'. Dump files are kept. Continue? [y/N] '
+  read -r a; [ "$a" = "y" ] || { say "cancelled"; return 0; }
+  compose down -v
+  ok "target volume removed"
+}
+
+cmd_prune() {
+  local id; id="$(current_run)"
+  say "backup runs in $BACKUP_ROOT:"
+  ls -1 "$BACKUP_ROOT" 2>/dev/null | grep '^run-' | while read -r r; do
+    printf '  %-24s %8s %s\n' "$r" "$(du -sh "$BACKUP_ROOT/$r" 2>/dev/null | awk '{print $1}')" \
+      "$( [ "$r" = "$id" ] && echo '(current)' )"
+  done
+  echo
+  echo "Delete one with:  rm -rf $BACKUP_ROOT/run-YYYYMMDD-HHMM"
+}
+
+cmd_help() {
+  cat <<EOF
+${C_BOLD}pgshuttle${C_RESET} -- copy a PostgreSQL database into a local debug copy, resumably
+
+  ${C_BOLD}Setup, once${C_RESET}                              ${C_DIM}(needs internet)${C_RESET}
+    ./pgshuttle init          create .env from the template
+    ./pgshuttle prepare       build the toolbox image, pull Postgres
+    ./pgshuttle doctor        confirm nothing else needs downloading
+
+  ${C_BOLD}Every backup${C_RESET}
+    ./pgshuttle preflight     check the source is reachable    ${C_DIM}needs source${C_RESET}
+    ./pgshuttle dump          pull the data (re-run to resume) ${C_DIM}needs source${C_RESET}
+    ./pgshuttle dump --new    start a fresh run instead of resuming
+    ./pgshuttle restore       load into the local container    ${C_DIM}offline${C_RESET}
+    ./pgshuttle restore --fresh   wipe the target first
+    ./pgshuttle verify        compare row counts               ${C_DIM}offline${C_RESET}
+
+  ${C_BOLD}Share it with the team${C_RESET}                     ${C_DIM}(offline, reads the local copy)${C_RESET}
+    ./pgshuttle export        one file anyone can pg_restore / open in pgAdmin
+    ./pgshuttle export --exclude '"schema".big_table'   skip bulky table data
+    ./pgshuttle import FILE   load a shared file into your local container
+
+  ${C_BOLD}Is it still working?${C_RESET}  ${C_DIM}(run in a second terminal)${C_RESET}
+    ./pgshuttle watch         live byte-level progress, warns when it stalls
+    ./pgshuttle activity      what the source server is doing  ${C_DIM}needs source${C_RESET}
+
+  ${C_BOLD}Around it${C_RESET}
+    ./pgshuttle status        one-shot summary of the current run
+    ./pgshuttle psql          psql on the restored copy
+    ./pgshuttle up | down     start / stop the target container
+    ./pgshuttle reset         delete the restored database volume
+    ./pgshuttle prune         list backup runs and their sizes
+    ./pgshuttle shell         bash inside the toolbox image
+
+  Restored copy: ${C_BOLD}postgresql://$TARGET_USER:***@localhost:$TARGET_PORT/$TARGET_DB${C_RESET}
+EOF
+}
+
+case "${1:-help}" in
+  init)      shift; cmd_init "$@" ;;
+  prepare)   shift; cmd_prepare "$@" ;;
+  doctor)    shift; cmd_doctor "$@" ;;
+  preflight) shift; cmd_preflight "$@" ;;
+  dump)      shift; cmd_dump "$@" ;;
+  restore)   shift; cmd_restore "$@" ;;
+  verify)    shift; cmd_verify "$@" ;;
+  status)    shift; cmd_status "$@" ;;
+  watch)     shift; cmd_watch "$@" ;;
+  export)    shift; cmd_export "$@" ;;
+  import)    shift; cmd_import "$@" ;;
+  activity)  shift; cmd_activity "$@" ;;
+  psql)      shift; cmd_psql "$@" ;;
+  shell)     shift; cmd_shell "$@" ;;
+  up)        shift; cmd_up "$@" ;;
+  down)      shift; cmd_down "$@" ;;
+  reset)     shift; cmd_reset "$@" ;;
+  prune)     shift; cmd_prune "$@" ;;
+  help|-h|--help) cmd_help ;;
+  *) bad "unknown command: $1"; echo; cmd_help; exit 1 ;;
+esac

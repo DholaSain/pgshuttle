@@ -1,0 +1,50 @@
+name: ${PROJECT:-pgshuttle}
+
+services:
+  # Throwaway Postgres that receives the production copy. Kept separate from the
+  # Homebrew Postgres on 5432 so nothing about the host install has to change --
+  # no listen_addresses edit, no pg_hba edit, no version conflict.
+  target:
+    image: ${PG_IMAGE:-postgres:16}
+    container_name: ${PROJECT:-pgshuttle}-target
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${TARGET_USER:-postgres}
+      POSTGRES_PASSWORD: ${TARGET_PASSWORD:-postgres}
+      POSTGRES_DB: ${TARGET_DB:-appdb}
+    ports:
+      - "127.0.0.1:${TARGET_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    shm_size: 1gb
+    # This database holds a disposable debug copy, so durability is traded for
+    # load speed. Never point these settings at anything you care about.
+    command:
+      - postgres
+      - -c
+      - fsync=off
+      - -c
+      - full_page_writes=off
+      - -c
+      - synchronous_commit=off
+      - -c
+      - max_wal_size=8GB
+      - -c
+      - checkpoint_timeout=30min
+      - -c
+      - maintenance_work_mem=512MB
+      - -c
+      - max_parallel_maintenance_workers=4
+      - -c
+      - max_wal_senders=0
+      - -c
+      - wal_level=minimal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TARGET_USER:-postgres} -d ${TARGET_DB:-appdb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  pgdata:
+    name: ${PROJECT:-pgshuttle}_pgdata

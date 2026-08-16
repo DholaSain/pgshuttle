@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="776" height="313"
+     viewBox="0 0 776 313" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace"
+     font-size="14" role="img" aria-label="pgshuttle watch  —  live progress, and a connection dying under it">
+  <rect width="776" height="313" rx="10" fill="#11141a" stroke="#2a2f3a"/>
+  <rect width="776" height="44" rx="10" fill="#1b1f27"/>
+  <rect y="34" width="776" height="10" fill="#1b1f27"/>
+  <line x1="0" y1="44" x2="776" y2="44" stroke="#2a2f3a"/>
+  <circle cx="20" cy="22" r="6" fill="#ff5f57"/><circle cx="38" cy="22" r="6" fill="#febc2e"/><circle cx="56" cy="22" r="6" fill="#28c840"/>
+  <text x="388" y="27" fill="#6b7280" font-size="12" text-anchor="middle">pgshuttle watch  —  live progress, and a connection dying under it</text>
+<g opacity="1"><animate attributeName="opacity" values="1;1;0;0;1" keyTimes="0;0.0714;0.0714;0.9996;1" dur="22.40s" begin="0s" repeatCount="indefinite"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:18:48</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         33M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                    8.5M  +1934 KB/s   idle 0s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#98c379">last change 0s ago -- progressing</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="1.60s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:18:50</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         36M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     11M  +1708 KB/s   idle 0s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#98c379">last change 0s ago -- progressing</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="3.20s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:18:52</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         39M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     14M  +1570 KB/s   idle 0s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#98c379">last change 0s ago -- progressing</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="4.80s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:18:54</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         42M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     17M  +1554 KB/s   idle 0s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#98c379">last change 0s ago -- progressing</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="6.40s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:18:56</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         45M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     20M  +1558 KB/s   idle 0s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#98c379">last change 0s ago -- progressing</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="8.00s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:18:58</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         48M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     23M  +1558 KB/s   idle 0s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#98c379">last change 0s ago -- progressing</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="9.60s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:19:01</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         51M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     26M  +1194 KB/s   idle 0s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#98c379">last change 0s ago -- progressing</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="11.20s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:19:03</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         51M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     26M  no growth    idle 3s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#98c379">last change 3s ago -- progressing</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="12.80s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:19:05</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         51M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     26M  no growth    idle 5s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e5c07b">quiet for 5s -- fine on a big table, suspicious past 10s</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="14.40s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:19:07</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         51M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     26M  no growth    idle 7s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e5c07b">quiet for 7s -- fine on a big table, suspicious past 10s</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="16.00s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:19:09</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         51M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     26M  no growth    idle 9s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e5c07b">quiet for 9s -- fine on a big table, suspicious past 10s</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="17.60s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:19:11</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         51M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     26M  no growth    idle 11s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e06c75">STALLED -- nothing has changed on disk for 11s</tspan></text>
+<text x="18" y="229.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e06c75">The connection is almost certainly dead. In the dump terminal press Ctrl-C,</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e06c75">restore the connection, then run ./pgshuttle dump again -- it resumes.</tspan></text>
+<text x="18" y="286.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="19.20s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:19:13</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         51M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     26M  no growth    idle 13s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e06c75">STALLED -- nothing has changed on disk for 13s</tspan></text>
+<text x="18" y="229.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e06c75">The connection is almost certainly dead. In the dump terminal press Ctrl-C,</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e06c75">restore the connection, then run ./pgshuttle dump again -- it resumes.</tspan></text>
+<text x="18" y="286.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+<g opacity="0"><animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.0714;0.0714;1" dur="22.40s" begin="20.80s" repeatCount="indefinite" fill="freeze"/>
+<text x="18" y="58.0" xml:space="preserve"><tspan fill="#c8ccd4" font-weight="600">watching run-20260816-0618</tspan><tspan fill="#c8ccd4">   06:19:15</tspan></text>
+<text x="18" y="96.0" xml:space="preserve"><tspan fill="#c8ccd4">  tables dumped   </tspan><tspan fill="#c8ccd4" font-weight="600">2/5</tspan></text>
+<text x="18" y="115.0" xml:space="preserve"><tspan fill="#c8ccd4">  on disk         51M</tspan></text>
+<text x="18" y="134.0" xml:space="preserve"><tspan fill="#c8ccd4">  in flight       1</tspan></text>
+<text x="18" y="172.0" xml:space="preserve"><tspan fill="#c8ccd4">    0001__public.sessions                                     26M  no growth    idle 15s</tspan></text>
+<text x="18" y="210.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e06c75">STALLED -- nothing has changed on disk for 15s</tspan></text>
+<text x="18" y="229.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e06c75">The connection is almost certainly dead. In the dump terminal press Ctrl-C,</tspan></text>
+<text x="18" y="248.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#e06c75">restore the connection, then run ./pgshuttle dump again -- it resumes.</tspan></text>
+<text x="18" y="286.0" xml:space="preserve"><tspan fill="#c8ccd4">  </tspan><tspan fill="#6b7280">Ctrl-C to stop watching (does not affect the dump)</tspan></text></g>
+</svg>
